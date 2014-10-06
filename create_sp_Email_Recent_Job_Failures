@@ -5,11 +5,12 @@ SET QUOTED_IDENTIFIER ON
 GO
 
 -- =============================================
--- Author:		Ryan Mueller
+-- Author:      Ryan Mueller
 -- Create date: 2014-10-06
 -- Description:	Proceedure will email semicolon delimited list of contacts the most recent SQL job failures in the last X number of days.
---				Hat tip to Jeremy Kadlec who documented this query online. I've simplified and created the Stored Proceedure.
---				http://www.mssqltips.com/sqlservertip/1054/failed-sql-server-agent-jobs
+--		Hat tip to Jeremy Kadlec who documented this query online. I've simplified and created the Stored Proceedure.
+--		http://www.mssqltips.com/sqlservertip/1054/failed-sql-server-agent-jobs
+-- 		See something you would like to change, please fork https://github.com/CreativeNotice/sql-email-recent-job-failures and share your improvements.
 -- =============================================
 CREATE PROCEDURE [dbo].[sp_Email_Recent_Job_Failures] 
 	@to VARCHAR(MAX),
