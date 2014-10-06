@@ -1,0 +1,68 @@
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Ryan Mueller
+-- Create date: 2014-10-06
+-- Description:	Proceedure will email semicolon delimited list of contacts the most recent SQL job failures in the last X number of days.
+--				Hat tip to Jeremy Kadlec who documented this query online. I've simplified and created the Stored Proceedure.
+--				http://www.mssqltips.com/sqlservertip/1054/failed-sql-server-agent-jobs
+-- =============================================
+CREATE PROCEDURE [dbo].[sp_Email_Recent_Job_Failures] 
+	@to VARCHAR(MAX),
+	@NumberDaysBack SMALLINT = 2
+AS
+BEGIN
+	SET NOCOUNT ON;
+
+	DECLARE @DaysBack smallint, @PastDate datetime, @Year VARCHAR(4), @Month VARCHAR(2), @Day VARCHAR(2), @FinalDate INT, @body varchar(max), @xml varchar(max);
+
+	SET @DaysBack = -1 * @NumberDaysBack;
+	SET @PastDate  = DATEADD(dd, @DaysBack, GETDATE());
+	SET @Month     = RIGHT('00'+CAST(DATEPART(mm,@PastDate) AS VARCHAR(2)),2);
+	SET @Day       = RIGHT('00'+CAST(DATEPART(dd,@PastDate) AS VARCHAR(2)),2);
+	SET @Year      = DATEPART(yyyy, @PastDate);
+	SET @FinalDate = CAST( @year + @Month + @Day AS INT);
+
+	SET @body = '<p>Below please find the most recent failed SQL jobs for the last '+ CAST(ABS(@DaysBack) as varchar) +' days.</p>'
+					+'<table cellpadding="6" cellspacing="0">'
+						+'<thead>'
+							+'<tr>'
+								+'<th style="background:black;color:lightgray">Job</th>'
+								+'<th style="background:black;color:lightgray">Step ID</th>'
+								+'<th style="background:black;color:lightgray">Step Name</th>'
+								+'<th style="background:black;color:lightgray">Server</th>'
+								+'<th style="background:black;color:lightgray">Date</th>'
+								+'<th style="background:black;color:lightgray">Runtime</th>'
+								+'<th style="background:black;color:lightgray">Severity</th>'
+								+'<th style="background:black;color:lightgray">Message</th>'
+							+'</tr>'
+						+'</thead>'
+						+'<tbody>';
+
+	SET @xml = (
+		SELECT	j.[name]     'td' ,''
+				, h.step_id      'td' ,''
+				, h.step_name    'td' ,''
+				, h.server       'td' ,''
+				, h.run_date     'td' ,''
+				, h.run_time     'td' ,''
+				, h.sql_severity 'td' ,''
+				, h.message      'td'
+		FROM	msdb.dbo.sysjobhistory h 
+				INNER JOIN msdb.dbo.sysjobs j ON h.job_id = j.job_id 
+				INNER JOIN msdb.dbo.sysjobsteps s ON j.job_id = s.job_id AND h.step_id = s.step_id
+		WHERE	h.run_status = 0 -- Failure 
+				AND h.run_date > @FinalDate 
+		ORDER BY h.instance_id DESC 
+		FOR XML PATH('tr'), ELEMENTS );
+
+	SET @body = @body + @xml + '</tbody></table>';
+
+	EXEC msdb.dbo.sp_send_dbmail @recipients = @to, @body = @body, @body_format ='HTML', @subject ='Recent SQL Job Failures';
+END
+
+GO
